@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Terms Organizer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            width: 100%;
+            margin: auto;
+        }
+        .left-section {
+            width: 60%;
+            padding: 10px;
+        }
+        .right-section {
+            width: 40%;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        .solution-section {
+            width: 30%;
+            padding: 10px;
+            display: none;
+        }
+        .drop-box {
+            width: 100%;
+            min-height: 150px;
+            border: 1px dashed #ccc;
+            margin: 10px 0;
+            position: relative;
+            overflow-y: auto;
+        }
+        .draggable, .dropped-term {
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid #333;
+            background-color: #f9f9f9;
+            cursor: grab;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .dropped-term {
+            background-color: #f0f0f0;
+        }
+        .price-box, .input-box {
+            margin-left: 10px;
+            padding: 5px;
+            border: 1px solid #333;
+        }
+        .price-box {
+            background-color: #e0e0e0;
+            display: inline-block;
+        }
+        .invalid {
+            background-color: #ffcccc;
+        }
+        .valid {
+            background-color: #ccffcc;
+        }
+        #feedback {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .solution-term {
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid #333;
+            background-color: #e6f3ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-section">
+            <h2>Assets</h2>
+            <div id="assets-box" class="drop-box"></div>
+            <h2>Liabilities and Stockholders' Equity</h2>
+            <div id="liabilities-box" class="drop-box"></div>
+            <div class="button-group">
+                <button id="validate-button">Validate</button>
+                <button id="reset-button">Reset</button>
+                <button id="show-solution-button">Show Solution</button>
+            </div>
+            <div id="feedback"></div>
+        </div>
+        <div class="right-section">
+            <h2>Randomized Terms and Prices</h2>
+            <div id="terms-box"></div>
+        </div>
+        <div class="solution-section" id="solution-section">
+            <h2>Correct Order</h2>
+            <h3>Assets</h3>
+            <div id="solution-assets"></div>
+            <h3>Liabilities and Stockholders' Equity</h3>
+            <div id="solution-liabilities"></div>
+        </div>
+    </div>
+    <script>
+        const baselineTerms = [
+            "Cash", "Accounts Receivable", "Notes Receivable", "Prepaid Expenses",
+            "Land", "Buildings", "Accumulated Depreciation-Buildings", "Equipment", 
+            "Accumulated Depreciation-Equipment", "Notes Payable", "Accounts Payable",
+            "Interest Payable", "Common Stock", "Retained Earnings"
+        ];
+
+        const categories = [
+            "Current Assets", "Total Current Assets", "Long-Term Investments", 
+            "Property, Plant, and Equipment", "Total Property, Plant, and Equipment", 
+            "Intangible Assets", "Total Assets", "Current Liabilities", 
+            "Total Current Liabilities", "Long-Term Liabilities", 
+            "Total Liabilities", "Stockholders' Equity", 
+            "Total Stockholders' Equity", "Total Liabilities and Stockholders' Equity"
+        ];
+
+        const requiredAssets = [
+            "Current Assets", "Cash", "Accounts Receivable", "Notes Receivable", 
+            "Prepaid Expenses", "Total Current Assets", "Property, Plant, and Equipment", 
+            "Land", "Buildings", "Less : Accumulated Depreciation-Buildings", 
+            "Equipment", "Less : Accumulated Depreciation-Equipment", 
+            "Total Property, Plant, and Equipment", "Total Assets"
+        ];
+
+        const requiredLiabilities = [
+            "Current Liabilities", "Notes Payable", "Accounts Payable", 
+            "Interest Payable", "Total Current Liabilities", "Long-Term Liabilities", 
+            "Total Liabilities", "Stockholders' Equity", "Common Stock", 
+            "Retained Earnings", "Total Stockholders' Equity", 
+            "Total Liabilities and Stockholders' Equity"
+        ];
+
+        let randomizedTerms = [];
+        let randomizedPrices = {};
+
+        function initializeTerms() {
+            randomizedTerms = [...baselineTerms, ...categories].sort(() => Math.random() - 0.5);
+            randomizedPrices = {};
+
+            randomizedTerms.forEach(term => {
+                if (baselineTerms.includes(term)) {
+                    randomizedPrices[term] = Math.floor(Math.random() * 8900) + 100;
+                }
+            });
+
+            renderTerms();
+        }
+
+        function renderTerms() {
+            const termsContainer = document.getElementById('terms-box');
+            termsContainer.innerHTML = '';
+
+            randomizedTerms.forEach(term => {
+                const div = createDraggableTermDiv(term);
+                termsContainer.appendChild(div);
+            });
+        }
+
+        function createDraggableTermDiv(term) {
+            const div = document.createElement('div');
+            div.className = 'draggable';
+            div.setAttribute('data-term', term);
+            const termName = document.createElement('span');
+            termName.textContent = term;
+
+            if (baselineTerms.includes(term)) {
+                const termPrice = document.createElement('span');
+                termPrice.textContent = `$${randomizedPrices[term]}`;
+                termPrice.className = 'price-box';
+                div.appendChild(termName);
+                div.appendChild(termPrice);
+            } else if (!["Total Current Assets", "Total Property, Plant, and Equipment", "Total Assets", "Total Current Liabilities", "Total Liabilities", "Total Stockholders' Equity", "Total Liabilities and Stockholders' Equity"].includes(term)) {
+                const inputBox = document.createElement('input');
+                inputBox.type = 'text';
+                inputBox.placeholder = 'Enter price';
+                inputBox.className = 'input-box';
+                div.appendChild(termName);
+                div.appendChild(inputBox);
+            } else {
+                div.appendChild(termName);
+            }
+
+            div.draggable = true;
+            div.ondragstart = (e) => {
+                e.dataTransfer.setData('text/plain', term);
+                e.dataTransfer.setData('source', 'terms-box');
+            };
+            return div;
+        }
+
+        function checkAllTermsPlaced() {
+            const assetsBoxTerms = Array.from(document.getElementById('assets-box').children).map(term => term.getAttribute('data-term'));
+            const liabilitiesBoxTerms = Array.from(document.getElementById('liabilities-box').children).map(term => term.getAttribute('data-term'));
+
+            let allCorrect = true;
+
+            requiredAssets.forEach((term, index) => {
+                if (assetsBoxTerms[index] === term) {
+                    markTermValid('assets-box', index);
+                } else {
+                    markTermInvalid('assets-box', index);
+                    allCorrect = false;
+                }
+            });
+
+            requiredLiabilities.forEach((term, index) => {
+                if (liabilitiesBoxTerms[index] === term) {
+                    markTermValid('liabilities-box', index);
+                } else {
+                    markTermInvalid('liabilities-box', index);
+                    allCorrect = false;
+                }
+            });
+
+            return allCorrect;
+        }
+
+        function markTermInvalid(boxId, index) {
+            const box = document.getElementById(boxId);
+            const terms = box.children;
+            if (terms[index]) {
+                terms[index].classList.add('invalid');
+                terms[index].classList.remove('valid');
+            }
+        }
+
+        function markTermValid(boxId, index) {
+            const box = document.getElementById(boxId);
+            const terms = box.children;
+            if (terms[index]) {
+                terms[index].classList.add('valid');
+                terms[index].classList.remove('invalid');
+            }
+        }
+
+        function validatePlacement() {
+            document.querySelectorAll('.invalid, .valid').forEach(term => {
+                term.classList.remove('invalid', 'valid');
+            });
+
+            const feedback = document.getElementById('feedback');
+
+            if (checkAllTermsPlaced()) {
+                feedback.textContent = 'All terms placed correctly!';
+                feedback.style.color = 'green';
+            } else {
+                feedback.textContent = 'Some terms are incorrectly placed!';
+                feedback.style.color = 'red';
+            }
+
+            validatePrices();
+        }
+
+        function validatePrices() {
+            const allTerms = [...document.getElementById('assets-box').children, ...document.getElementById('liabilities-box').children];
+            allTerms.forEach(termDiv => {
+                const term = termDiv.getAttribute('data-term');
+                const inputBox = termDiv.querySelector('.input-box');
+                if (inputBox) {
+                    const userPrice = parseFloat(inputBox.value);
+                    const correctPrice = calculateCategoryPrice(term);
+                    if (userPrice === correctPrice) {
+                        inputBox.style.backgroundColor = '#ccffcc';
+                    } else {
+                        inputBox.style.backgroundColor = '#ffcccc';
+                    }
+                }
+            });
+        }
+
+        function calculateCategoryPrice(term) {
+            const assetsBoxTerms = Array.from(document.getElementById('assets-box').children);
+            const liabilitiesBoxTerms = Array.from(document.getElementById('liabilities-box').children);
+            const allTerms = [...assetsBoxTerms, ...liabilitiesBoxTerms];
+
+            switch (term) {
+                case "Total Current Assets":
+                    return sumPrices(["Cash", "Accounts Receivable", "Prepaid Expenses"], allTerms);
+                case "Total Property, Plant, and Equipment":
+                    const landPrice = getPriceForTerm("Land", allTerms);
+                    const buildingsPrice = getPriceForTerm("Buildings", allTerms);
+                    const accumulatedDepreciationBuildings = getPriceForTerm("Accumulated Depreciation-Buildings", allTerms);
+                    const equipmentPrice = getPriceForTerm("Equipment", allTerms);
+                    const accumulatedDepreciationEquipment = getPriceForTerm("Accumulated Depreciation-Equipment", allTerms);
+                    return landPrice + buildingsPrice - accumulatedDepreciationBuildings + equipmentPrice - accumulatedDepreciationEquipment;
+                case "Total Assets":
+                    return getPriceForTerm("Total Current Assets", allTerms) + getPriceForTerm("Total Property, Plant, and Equipment", allTerms);
+                case "Total Current Liabilities":
+                    return sumPrices(["Notes Payable", "Accounts Payable", "Interest Payable"], allTerms);
+                case "Total Liabilities":
+                    return getPriceForTerm("Long-Term Liabilities", allTerms) + getPriceForTerm("Notes Payable", allTerms);
+                case "Total Stockholders' Equity":
+                    return sumPrices(["Stockholders' Equity", "Common Stock", "Retained Earnings"], allTerms);
+                case "Total Liabilities and Stockholders' Equity":
+                    return getPriceForTerm("Total Liabilities", allTerms) + getPriceForTerm("Total Stockholders' Equity", allTerms);
+                default:
+                    return 0;
+            }
+        }
+
+        function sumPrices(terms, allTerms) {
+            return terms.reduce((sum, term) => sum + getPriceForTerm(term, allTerms), 0);
+        }
+
+        function getPriceForTerm(term, allTerms) {
+            const termDiv = allTerms.find(t => t.getAttribute('data-term') === term);
+            if (termDiv) {
+                const priceElement = termDiv.querySelector('.price-box, .input-box');
+                return priceElement ? parseFloat(priceElement.value || priceElement.textContent.replace('$', '')) || 0 : 0;
+            }
+            return 0;
+        }
+
+        function resetTerms() {
+            initializeTerms();
+            document.querySelectorAll('.invalid, .valid').forEach(term => {
+                term.classList.remove('invalid', 'valid');
+            });
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('assets-box').innerHTML = '';
+            document.getElementById('liabilities-box').innerHTML = '';
+            document.getElementById('solution-section').style.display = 'none';
+            adjustLayout();
+        }
+
+        function showSolution() {
+            const solutionSection = document.getElementById('solution-section');
+            const solutionAssets = document.getElementById('solution-assets');
+            const solutionLiabilities = document.getElementById('solution-liabilities');
+
+            solutionAssets.innerHTML = '';
+            solutionLiabilities.innerHTML = '';
+
+            requiredAssets.forEach(term => {
+                const div = document.createElement('div');
+                div.className = 'solution-term';
+                div.textContent = term;
+                if (categories.includes(term)) {
+                    const price = calculateCategoryPrice(term);
+                    div.textContent += ` - $${price}`;
+                } else if (baselineTerms.includes(term)) {
+                    div.textContent += ` - $${randomizedPrices[term]}`;
+                }
+                solutionAssets.appendChild(div);
+            });
+
+            requiredLiabilities.forEach(term => {
+                const div = document.createElement('div');
+                div.className = 'solution-term';
+                div.textContent = term;
+                if (categories.includes(term)) {
+                    const price = calculateCategoryPrice(term);
+                    div.textContent += ` - $${price}`;
+                } else if (baselineTerms.includes(term)) {
+                    div.textContent += ` - $${randomizedPrices[term]}`;
+                }
+                solutionLiabilities.appendChild(div);
+            });
+
+            solutionSection.style.display = 'block';
+            adjustLayout();
+        }
+
+        function adjustLayout() {
+            const container = document.querySelector('.container');
+            const leftSection = document.querySelector('.left-section');
+            const rightSection = document.querySelector('.right-section');
+            const solutionSection = document.getElementById('solution-section');
+
+            if (solutionSection.style.display === 'none') {
+                leftSection.style.width = '60%';
+                rightSection.style.width = '40%';
+                solutionSection.style.width = '0%';
+            } else {
+                leftSection.style.width = '40%';
+                rightSection.style.width = '30%';
+                solutionSection.style.width = '30%';
+            }
+        }
+
+        // Initialize the game
+        initializeTerms();
+
+        // Set up drag and drop functionality
+        document.querySelectorAll('.drop-box').forEach(box => {
+            box.ondragover = (e) => {
+                e.preventDefault();
+            };
+
+            box.ondrop = (e) => {
+                e.preventDefault();
+                const term = e.dataTransfer.getData('text/plain');
+                const source = e.dataTransfer.getData('source');
+                
+                let termDiv;
+                if (source === 'terms-box') {
+                    termDiv = createDraggableTermDiv(term);
+                    termDiv.className = 'dropped-term';
+                    termDiv.ondragstart = (e) => {
+                        e.dataTransfer.setData('text/plain', term);
+                        e.dataTransfer.setData('source', 'drop-box');
+                    };
+                } else {
+                    termDiv = document.querySelector(`.dropped-term[data-term="${term}"]`);
+                    if (termDiv) {
+                        termDiv.remove();
+                    } else {
+                        return;
+                    }
+                }
+
+                const rect = box.getBoundingClientRect();
+                const y = e.clientY - rect.top;
+                const elements = Array.from(box.children);
+                const index = elements.findIndex(el => {
+                    const elRect = el.getBoundingClientRect();
+                    return y <= elRect.top + elRect.height / 2 - rect.top;
+                });
+
+                if (index !== -1) {
+                    box.insertBefore(termDiv, elements[index]);
+                } else {
+                    box.appendChild(termDiv);
+                }
+
+                if (source === 'terms-box') {
+                    const originalTermDiv = document.querySelector(`.draggable[data-term="${term}"]`);
+                    if (originalTermDiv) {
+                        originalTermDiv.remove();
+                    }
+                }
+            };
+        });
+
+        // Set up button event listeners
+        document.getElementById('validate-button').addEventListener('click', validatePlacement);
+        document.getElementById('reset-button').addEventListener('click', resetTerms);
+        document.getElementById('show-solution-button').addEventListener('click', showSolution);
+    </script>
+</body>
+</html>
